@@ -8,7 +8,7 @@ LOG_DEBUG = 3
 LOG_ALL = 99
 
 
-class Logger(object): #Object inheritence for child 'RospyLogger' (Jordy)
+class Logger:
     def __init__(self, header=''):
         self.log_level = LOG_INFO
         self.header_string = header
@@ -49,9 +49,10 @@ class Logger(object): #Object inheritence for child 'RospyLogger' (Jordy)
 
 if __name__ == '__main__':
     log = Logger('test')
+    log.set_level(2)
     log.error('This is an error message')
     log.warn('This is a warning message')
     log.info('This is an info message')
     log.debug('This should ** NOT **  be displayed')
-    log.set_level(LOG_ALL)
+    
     log.debug('This is a debug message')
