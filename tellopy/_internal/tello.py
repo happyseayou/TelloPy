@@ -90,9 +90,6 @@ class Tello(object):
         # video zoom state
         self.zoom = False
 
-        # fast mode state
-        self.fast_mode = False   
-        
         # File recieve state.
         self.file_recv = {}  # Map filenum -> protocol.DownloadedFile
 
@@ -204,61 +201,6 @@ class Tello(object):
         log.info('quit')
         self.__publish(event=self.__EVENT_QUIT_REQ)
 
-    def get_alt_limit(self):
-        ''' ... '''
-        self.log.debug('get altitude limit (cmd=0x%02x seq=0x%04x)' % (
-            ALT_LIMIT_MSG, self.pkt_seq_num))
-        pkt = Packet(ALT_LIMIT_MSG)
-        pkt.fixup()
-        return self.send_packet(pkt)
-        
-    def set_alt_limit(self, limit):
-        self.log.info('set altitude limit=%s (cmd=0x%02x seq=0x%04x)' % (
-            int(limit), SET_ALT_LIMIT_CMD, self.pkt_seq_num))
-        pkt = Packet(SET_ALT_LIMIT_CMD)
-        pkt.add_byte(int(limit))
-        pkt.add_byte(0x00)
-        pkt.fixup()        
-        self.send_packet(pkt)
-        self.get_alt_limit()
-
-    def get_att_limit(self):
-        ''' ... '''
-        self.log.debug('get attitude limit (cmd=0x%02x seq=0x%04x)' % (
-            ATT_LIMIT_MSG, self.pkt_seq_num))
-        pkt = Packet(ATT_LIMIT_MSG)
-        pkt.fixup()
-        return self.send_packet(pkt)
-        
-    def set_att_limit(self, limit):
-        self.log.info('set attitude limit=%s (cmd=0x%02x seq=0x%04x)' % (
-            int(limit), ATT_LIMIT_CMD, self.pkt_seq_num))
-        pkt = Packet(ATT_LIMIT_CMD)
-        pkt.add_byte(0x00)        
-        pkt.add_byte(0x00)
-        pkt.add_byte( int(float_to_hex(float(limit))[4:6], 16) ) # 'attitude limit' formatted in float of 4 bytes
-        pkt.add_byte(0x41)
-        pkt.fixup()
-        self.send_packet(pkt)
-        self.get_att_limit()
-
-    def get_low_bat_threshold(self):
-        ''' ... '''
-        self.log.debug('get low battery threshold (cmd=0x%02x seq=0x%04x)' % (
-            LOW_BAT_THRESHOLD_MSG, self.pkt_seq_num))
-        pkt = Packet(LOW_BAT_THRESHOLD_MSG)
-        pkt.fixup()
-        return self.send_packet(pkt)
-        
-    def set_low_bat_threshold(self, threshold):
-        self.log.info('set low battery threshold=%s (cmd=0x%02x seq=0x%04x)' % (
-            int(threshold), LOW_BAT_THRESHOLD_CMD, self.pkt_seq_num))
-        pkt = Packet(LOW_BAT_THRESHOLD_CMD)
-        pkt.add_byte(int(threshold))
-        pkt.fixup()        
-        self.send_packet(pkt)
-        self.get_low_bat_threshold()
-
     def __send_time_command(self):
         log.info('send_time (cmd=0x%02x seq=0x%04x)' % (TIME_CMD, self.pkt_seq_num))
         pkt = Packet(TIME_CMD, 0x50)
@@ -327,32 +269,32 @@ class Tello(object):
 
     def up(self, val):
         """Up tells the drone to ascend. Pass in an int from 0-100."""
-        log.info('up(val=%d)' % val)
+        log.debug('up(val=%d)' % val)
         self.left_y = val / 100.0
 
     def down(self, val):
         """Down tells the drone to descend. Pass in an int from 0-100."""
-        log.info('down(val=%d)' % val)
+        log.debug('down(val=%d)' % val)
         self.left_y = val / 100.0 * -1
 
     def forward(self, val):
         """Forward tells the drone to go forward. Pass in an int from 0-100."""
-        log.info('forward(val=%d)' % val)
+        log.debug('forward(val=%d)' % val)
         self.right_y = val / 100.0
 
     def backward(self, val):
         """Backward tells the drone to go in reverse. Pass in an int from 0-100."""
-        log.info('backward(val=%d)' % val)
+        log.debug('backward(val=%d)' % val)
         self.right_y = val / 100.0 * -1
 
     def right(self, val):
         """Right tells the drone to go right. Pass in an int from 0-100."""
-        log.info('right(val=%d)' % val)
+        log.debug('right(val=%d)' % val)
         self.right_x = val / 100.0
 
     def left(self, val):
         """Left tells the drone to go left. Pass in an int from 0-100."""
-        log.info('left(val=%d)' % val)
+        log.debug('left(val=%d)' % val)
         self.right_x = val / 100.0 * -1
 
     def clockwise(self, val):
@@ -360,7 +302,7 @@ class Tello(object):
         Clockwise tells the drone to rotate in a clockwise direction.
         Pass in an int from 0-100.
         """
-        log.info('clockwise(val=%d)' % val)
+        log.debug('clockwise(val=%d)' % val)
         self.left_x = val / 100.0
 
     def counter_clockwise(self, val):
@@ -478,20 +420,6 @@ class Tello(object):
             log.info('set_roll(val=%4.2f)' % roll)
         self.right_x = self.__fix_range(roll)
 
-    def toggle_fast_mode(self):
-        if self.fast_mode:
-            self.fast_mode = False
-        elif not self.fast_mode:
-            self.fast_mode = True
-            
-    def manual_takeoff(self):
-        # Hold max 'yaw' and min 'pitch', 'roll', 'throttle' for several seconds
-        self.set_pitch(-1)
-        self.set_roll(-1)
-        self.set_yaw(1)
-        self.set_throttle(-1)
-        self.fast_mode = False            
-
     def __send_stick_command(self):
         pkt = Packet(STICK_CMD, 0x60)
 
@@ -499,10 +427,8 @@ class Tello(object):
         axis2 = int(1024 + 660.0 * self.right_y) & 0x7ff
         axis3 = int(1024 + 660.0 * self.left_y) & 0x7ff
         axis4 = int(1024 + 660.0 * self.left_x) & 0x7ff
-        axis5 = int(self.fast_mode) & 0x01        
         '''
         11 bits (-1024 ~ +1023) x 4 axis = 44 bits
-        fast_mode takes 1 bit        
         44 bits will be packed in to 6 bytes (48 bits)
 
                     axis4      axis3      axis2      axis1
@@ -512,19 +438,16 @@ class Tello(object):
          |       |       |       |       |       |       |
              byte5   byte4   byte3   byte2   byte1   byte0
         '''
-        log.debug("stick command: fast=%d yaw=%4d thr=%4d pit=%4d rol=%4d" %
-                  (axis5, axis4, axis3, axis2, axis1))
-        log.debug("stick command: fast=%04x yaw=%04x thr=%04x pit=%04x rol=%04x" %
-                  (axis5, axis4, axis3, axis2, axis1))
-        packed = axis1 | (axis2 << 11) | (
-            axis3 << 22) | (axis4 << 33) | (axis5 << 44)
-        packed_bytes = struct.pack('<Q', packed)
-        pkt.add_byte(byte(packed_bytes[0]))
-        pkt.add_byte(byte(packed_bytes[1]))
-        pkt.add_byte(byte(packed_bytes[2]))
-        pkt.add_byte(byte(packed_bytes[3]))
-        pkt.add_byte(byte(packed_bytes[4]))
-        pkt.add_byte(byte(packed_bytes[5]))
+        log.debug("stick command: yaw=%4d thr=%4d pit=%4d rol=%4d" %
+                  (axis4, axis3, axis2, axis1))
+        log.debug("stick command: yaw=%04x thr=%04x pit=%04x rol=%04x" %
+                  (axis4, axis3, axis2, axis1))
+        pkt.add_byte(((axis2 << 11 | axis1) >> 0) & 0xff)
+        pkt.add_byte(((axis2 << 11 | axis1) >> 8) & 0xff)
+        pkt.add_byte(((axis3 << 11 | axis2) >> 5) & 0xff)
+        pkt.add_byte(((axis4 << 11 | axis3) >> 2) & 0xff)
+        pkt.add_byte(((axis4 << 11 | axis3) >> 10) & 0xff)
+        pkt.add_byte(((axis4 << 11 | axis3) >> 18) & 0xff)
         pkt.add_time()
         pkt.fixup()
         log.debug("stick command: %s" % byte_to_hexstring(pkt.get_buffer()))
@@ -609,14 +532,8 @@ class Tello(object):
             log.debug("recv: wifi: %s" % byte_to_hexstring(data[9:]))
             self.wifi_strength = data[9]
             self.__publish(event=self.EVENT_WIFI, data=data[9:])
-        elif cmd == ALT_LIMIT_MSG:
-            log.info("recv: altitude limit: %s" % byte_to_hexstring(data[9:-2]))
-        elif cmd == ATT_LIMIT_MSG:
-            log.info("recv: attitude limit: %s" % byte_to_hexstring(data[9:-2]))
-        elif cmd == LOW_BAT_THRESHOLD_MSG:
-            log.info("recv: low battery threshold: %s" % byte_to_hexstring(data[9:-2]))
         elif cmd == LIGHT_MSG:
-            log.debug("recv: light: %s" % byte_to_hexstring(data[9:-2]))
+            log.debug("recv: light: %s" % byte_to_hexstring(data[9:]))
             self.__publish(event=self.EVENT_LIGHT, data=data[9:])
         elif cmd == FLIGHT_MSG:
             flight_data = FlightData(data[9:])
@@ -626,9 +543,9 @@ class Tello(object):
         elif cmd == TIME_CMD:
             log.debug("recv: time data: %s" % byte_to_hexstring(data))
             self.__publish(event=self.EVENT_TIME, data=data[7:9])
-        elif cmd in (SET_ALT_LIMIT_CMD, ATT_LIMIT_CMD, LOW_BAT_THRESHOLD_CMD, TAKEOFF_CMD, LAND_CMD, VIDEO_START_CMD, VIDEO_ENCODER_RATE_CMD, PALM_LAND_CMD,
-                     EXPOSURE_CMD, THROW_AND_GO_CMD, EMERGENCY_CMD):
-            log.debug("recv: ack: cmd=0x%02x seq=0x%04x %s" %
+        elif cmd in (TAKEOFF_CMD, LAND_CMD, VIDEO_START_CMD, VIDEO_ENCODER_RATE_CMD, PALM_LAND_CMD,
+                     EXPOSURE_CMD, THROW_AND_GO_CMD):
+            log.info("recv: ack: cmd=0x%02x seq=0x%04x %s" %
                      (uint16(data[5], data[6]), uint16(data[7], data[8]), byte_to_hexstring(data)))
         elif cmd == TELLO_CMD_FILE_SIZE:
             # Drone is about to send us a file. Get ready.
